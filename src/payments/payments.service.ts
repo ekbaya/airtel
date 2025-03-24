@@ -1,7 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AirtelService } from '../airtel/airtel.service';
-import { UssdPaymentRequestDto, UssdPaymentResponseDto } from './dto';
+import {
+  TransactionStatusResponseDto,
+  UssdPaymentRequestDto,
+  UssdPaymentResponseDto,
+} from './dto';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -50,6 +54,45 @@ export class PaymentsService {
       return response;
     } catch (error) {
       this.logger.error('USSD Payment initiation failed', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Enquire about transaction status
+   * @param transactionId Transaction ID to check status
+   * @param country Transaction Country
+   * @param currency Transaction Currency
+   * @returns Transaction status details
+   */
+  async getTransactionStatus(
+    transactionId: string,
+    country: string,
+    currency: string,
+  ): Promise<TransactionStatusResponseDto> {
+    try {
+      // Prepare headers as per API specification
+      const additionalHeaders = {
+        Accept: 'application/json',
+        'X-Country': country,
+        'X-Currency': currency,
+      };
+
+      // Make the API request to check transaction status
+      const response =
+        await this.airtelService.makeApiRequest<TransactionStatusResponseDto>(
+          `standard/v1/payments/${transactionId}`,
+          'GET',
+          additionalHeaders,
+        );
+
+      this.logger.log(`Transaction status retrieved for ID: ${transactionId}`);
+      return response;
+    } catch (error) {
+      this.logger.error(
+        `Failed to retrieve transaction status for ID: ${transactionId}`,
+        error,
+      );
       throw error;
     }
   }

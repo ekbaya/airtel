@@ -5,9 +5,15 @@ import {
   Headers,
   UseInterceptors,
   ClassSerializerInterceptor,
+  Get,
+  Param,
 } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
-import { UssdPaymentRequestDto, UssdPaymentResponseDto } from './dto';
+import {
+  TransactionStatusResponseDto,
+  UssdPaymentRequestDto,
+  UssdPaymentResponseDto,
+} from './dto';
 
 @Controller('payments')
 @UseInterceptors(ClassSerializerInterceptor)
@@ -22,6 +28,19 @@ export class PaymentsController {
   ): Promise<UssdPaymentResponseDto> {
     return this.paymentsService.initiateUssdPayment(
       paymentRequest,
+      country,
+      currency,
+    );
+  }
+
+  @Get('status/:transactionId')
+  async getTransactionStatus(
+    @Param('transactionId') transactionId: string,
+    @Headers('X-Country') country: string,
+    @Headers('X-Currency') currency: string,
+  ): Promise<TransactionStatusResponseDto> {
+    return this.paymentsService.getTransactionStatus(
+      transactionId,
       country,
       currency,
     );

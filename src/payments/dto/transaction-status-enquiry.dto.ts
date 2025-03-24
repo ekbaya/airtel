@@ -12,25 +12,6 @@ export class TransactionStatusEnquiryRequestDto {
   reference?: string;
 }
 
-export class TransactionStatusResponseDto {
-  @IsObject()
-  @ValidateNested()
-  @Type(() => TransactionDataDto)
-  data: TransactionDataDto;
-}
-
-export class TransactionDataDto {
-  @IsObject()
-  @ValidateNested()
-  @Type(() => TransactionDetailsDto)
-  transaction: TransactionDetailsDto;
-
-  @IsObject()
-  @ValidateNested()
-  @Type(() => TransactionStatusDto)
-  status: TransactionStatusDto;
-}
-
 export class TransactionDetailsDto {
   @IsString()
   @IsOptional()
@@ -68,4 +49,22 @@ export class TransactionStatusDto {
 
   @IsOptional()
   success: boolean = false;
+}
+export class TransactionDataDto {
+  @IsObject()
+  @ValidateNested()
+  @Type(() => TransactionDetailsDto)
+  transaction: TransactionDetailsDto;
+
+  @IsObject()
+  @ValidateNested()
+  @Type(() => TransactionStatusDto)
+  status: TransactionStatusDto;
+}
+
+export class TransactionStatusResponseDto {
+  @IsObject()
+  @ValidateNested()
+  @Type(() => TransactionDataDto)
+  data: TransactionDataDto;
 }
