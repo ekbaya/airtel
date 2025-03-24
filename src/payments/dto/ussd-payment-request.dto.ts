@@ -1,4 +1,3 @@
-// src/payments/dtos/ussd-payment-request.dto.ts
 import {
   IsString,
   IsNumber,
@@ -51,7 +50,6 @@ export class UssdPaymentRequestDto {
   transaction: TransactionDto;
 }
 
-// src/payments/dtos/ussd-payment-response.dto.ts
 export class PaymentStatusDto {
   @IsString()
   code: string;
