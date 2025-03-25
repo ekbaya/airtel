@@ -13,6 +13,7 @@ import {
   TransactionStatusResponseDto,
   UssdPaymentRequestDto,
   UssdPaymentResponseDto,
+  CallbackRequestDto,
 } from './dto';
 
 @Controller('payments')
@@ -43,6 +44,17 @@ export class PaymentsController {
       transactionId,
       country,
       currency,
+    );
+  }
+
+  @Post('callback')
+  async handlePaymentCallback(
+    @Body() callbackRequest: CallbackRequestDto,
+    @Headers('Content-Type') contentType: string,
+  ): Promise<{ status: string }> {
+    return this.paymentsService.processPaymentCallback(
+      callbackRequest,
+      contentType,
     );
   }
 }

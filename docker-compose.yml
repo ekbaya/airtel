@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: nestjs-rabbitmq
+    ports:
+      # AMQP protocol port
+      - '5672:5672'
+      # RabbitMQ management UI port
+      - '15672:15672'
+    environment:
+      # Default RabbitMQ credentials
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-admin}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-adminpassword}
+    volumes:
+      # Persist RabbitMQ data
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', 'ping']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - app-network
+
+volumes:
+  rabbitmq_data:
+    driver: local
+
+networks:
+  app-network:
+    driver: bridge

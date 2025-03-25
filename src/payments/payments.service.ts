@@ -1,18 +1,29 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AirtelService } from '../airtel/airtel.service';
+
+import * as crypto from 'crypto';
 import {
   TransactionStatusResponseDto,
   UssdPaymentRequestDto,
   UssdPaymentResponseDto,
+  CallbackRequestDto,
+  CallbackTransactionData,
 } from './dto';
-import * as crypto from 'crypto';
+import { ClientProxy, RmqRecordBuilder } from '@nestjs/microservices';
 
 @Injectable()
 export class PaymentsService {
   private readonly logger = new Logger(PaymentsService.name);
 
   constructor(
+    @Inject('PAYMENT_RESULT_SERVICE')
+    private readonly paymentResultClient: ClientProxy,
     private readonly airtelService: AirtelService,
     private readonly configService: ConfigService,
   ) {}
@@ -33,21 +44,14 @@ export class PaymentsService {
         Accept: 'application/json',
       };
 
-      // Optional: Implement message signing if required
-      const { signature, key } = this.generateMessageSignature(paymentRequest);
-
-      if (signature && key) {
-        additionalHeaders['x-signature'] = signature;
-        additionalHeaders['x-key'] = key;
-      }
-
-      // Make the API request
+      // Make the API request (signature is required)
       const response =
         await this.airtelService.makeApiRequest<UssdPaymentResponseDto>(
           'merchant/v2/payments/',
           'POST',
           paymentRequest,
           additionalHeaders,
+          { signatureRequired: true },
         );
 
       this.logger.log('USSD Payment initiated successfully');
@@ -97,49 +101,132 @@ export class PaymentsService {
     }
   }
 
-  /**
-   * Generate message signature (if required by API)
-   * Note: Implement actual encryption logic based on Airtel's specific requirements
-   */
-  private generateMessageSignature(payload: UssdPaymentRequestDto): {
-    signature?: string;
-    key?: string;
-  } {
+  async processPaymentCallback(
+    callbackRequest: CallbackRequestDto,
+    contentType: string,
+  ): Promise<{ status: string }> {
+    // Validate Content-Type
+    this.validateContentType(contentType);
+
+    // Authenticate callback if hash is provided
+    this.authenticateCallback(callbackRequest);
+
+    // Process the transaction based on its status
+    return this.handleTransactionCallback(callbackRequest);
+  }
+
+  private validateContentType(contentType: string): void {
+    if (contentType !== 'application/json') {
+      throw new UnauthorizedException('Invalid Content-Type');
+    }
+  }
+
+  private authenticateCallback(callbackRequest: CallbackRequestDto): void {
+    const privateKey = this.configService.get<string>('AIRTEL_PRIVATE_KEY');
+    const enableCallbackAuth = this.configService.get<boolean>(
+      'ENABLE_CALLBACK_AUTH',
+      false,
+    );
+
+    // Skip authentication if not enabled
+    if (!enableCallbackAuth || !privateKey) {
+      return;
+    }
+
+    // If authentication is enabled, hash must be present
+    if (!callbackRequest.hash) {
+      throw new UnauthorizedException('Callback hash is missing');
+    }
+
+    // Prepare the payload for hashing (exclude the hash itself)
+    const payload = JSON.stringify(callbackRequest.transaction);
+
+    // Generate HMAC SHA256 hash in Base64
+    const generatedHash = crypto
+      .createHmac('sha256', privateKey)
+      .update(payload)
+      .digest('base64');
+
+    // Compare the generated hash with the received hash
+    if (generatedHash !== callbackRequest.hash) {
+      throw new UnauthorizedException('Invalid callback authentication');
+    }
+  }
+
+  private async handleTransactionCallback(
+    callbackRequest: CallbackRequestDto,
+  ): Promise<{ status: string }> {
     try {
-      // Check if signature is enabled in configuration
-      const isSignatureEnabled = this.configService.get<boolean>(
-        'AIRTEL_SIGNATURE_ENABLED',
-        false,
-      );
+      const { transaction } = callbackRequest;
 
-      if (!isSignatureEnabled) {
-        return {};
+      // Log the callback for audit purposes
+      this.logger.log(`Received callback for transaction: ${transaction.id}`);
+
+      // Process based on transaction status
+      switch (transaction.status_code) {
+        case 'TS': // Transaction Success
+          await this.handleSuccessfulTransaction(transaction);
+          break;
+        case 'TF': // Transaction Failed
+          await this.handleFailedTransaction(transaction);
+          break;
+        default:
+          this.logger.warn(`Unknown status code: ${transaction.status_code}`);
       }
 
-      // Placeholder for actual signature generation
-      // You'll need to replace this with Airtel's specific encryption method
-      const secretKey = this.configService.get<string>(
-        'AIRTEL_SIGNATURE_SECRET',
-      );
-
-      if (!secretKey) {
-        this.logger.warn('Signature secret not configured');
-        return {};
-      }
-
-      // Example placeholder - replace with actual implementation
-      const signature = crypto
-        .createHmac('sha256', secretKey)
-        .update(JSON.stringify(payload))
-        .digest('base64');
-
-      // Placeholder for key generation
-      const key = 'PLACEHOLDER_ENCRYPTED_KEY';
-
-      return { signature, key };
+      return { status: 'OK' };
     } catch (error) {
-      this.logger.error('Failed to generate message signature', error);
-      return {};
+      this.logger.error('Error processing payment callback', error);
+      throw error;
+    }
+  }
+
+  async handleSuccessfulTransaction(transaction: CallbackTransactionData) {
+    try {
+      // Create a record with additional options if needed
+      const record = new RmqRecordBuilder({
+        ...transaction,
+        status: 'SUCCESS',
+        timestamp: new Date().toISOString(),
+      })
+        .setOptions({
+          headers: {
+            'x-transaction-type': 'payment-success',
+          },
+          priority: 1, // Optional priority
+        })
+        .build();
+
+      // Emit the event to RabbitMQ
+      await this.paymentResultClient
+        .emit('payment.success', record)
+        .toPromise();
+    } catch (error) {
+      // Log or handle error
+      console.error('Failed to publish payment success', error);
+    }
+  }
+
+  async handleFailedTransaction(transaction: CallbackTransactionData) {
+    try {
+      const record = new RmqRecordBuilder({
+        ...transaction,
+        status: 'FAILED',
+        timestamp: new Date().toISOString(),
+      })
+        .setOptions({
+          headers: {
+            'x-transaction-type': 'payment-failure',
+          },
+          priority: 2, // Potentially higher priority for failures
+        })
+        .build();
+
+      await this.paymentResultClient
+        .emit('payment.failure', record)
+        .toPromise();
+    } catch (error) {
+      console.error('Failed to publish payment failure', error);
     }
   }
 }
