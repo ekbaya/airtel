@@ -16,13 +16,14 @@ import {
   CallbackTransactionData,
 } from './dto';
 import { ClientProxy, RmqRecordBuilder } from '@nestjs/microservices';
+import { PaymentServices } from 'src/domain/constants/payment';
 
 @Injectable()
 export class PaymentsService {
   private readonly logger = new Logger(PaymentsService.name);
 
   constructor(
-    @Inject('PAYMENT_RESULT_SERVICE')
+    @Inject(PaymentServices.PaymentResultService)
     private readonly paymentResultClient: ClientProxy,
     private readonly airtelService: AirtelService,
     private readonly configService: ConfigService,

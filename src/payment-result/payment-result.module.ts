@@ -3,17 +3,18 @@ import { ClientsModule } from '@nestjs/microservices';
 import { PaymentResultController } from './payment-result.controller';
 import { RabbitMqconfigModule } from 'src/rabbit-mqconfig/rabbit-mqconfig.module';
 import { RabbitMQConfigService } from 'src/rabbit-mqconfig/rabbit-mqconfig.service';
+import { PaymentQueues, PaymentServices } from 'src/domain/constants/payment';
 
 @Module({
   imports: [
-    RabbitMqconfigModule, // ✅ Ensure this is imported
+    RabbitMqconfigModule,
     ClientsModule.registerAsync([
       {
-        name: 'PAYMENT_RESULT_SERVICE',
-        imports: [RabbitMqconfigModule], // ✅ Ensure RabbitMQConfigModule is included here
+        name: PaymentServices.PaymentResultService,
+        imports: [RabbitMqconfigModule],
         useFactory: (configService: RabbitMQConfigService) =>
-          configService.createRmqOptions('payment-result-queue'),
-        inject: [RabbitMQConfigService], // ✅ Ensure it's properly injected
+          configService.createRmqOptions(PaymentQueues.PaymentQueue),
+        inject: [RabbitMQConfigService],
       },
     ]),
   ],
