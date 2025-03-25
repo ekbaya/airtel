@@ -10,7 +10,7 @@ import {
   CallbackRequestDto,
   CallbackTransactionData,
 } from './dto';
-import { RabbitMQService } from 'src/rabbit-mq/rabbit-mq.service';
+import { RabbitMQService } from '../rabbit-mq/rabbit-mq.service';
 
 @Injectable()
 export class PaymentsService {
@@ -39,14 +39,13 @@ export class PaymentsService {
       };
 
       // Make the API request (signature is required)
-      const response =
-        await this.airtelService.makeApiRequest<UssdPaymentResponseDto>(
-          'merchant/v2/payments/',
-          'POST',
-          paymentRequest,
-          additionalHeaders,
-          { signatureRequired: true },
-        );
+      const response = (await this.airtelService.makeApiRequest(
+        'merchant/v2/payments/',
+        'POST',
+        paymentRequest,
+        additionalHeaders,
+        { signatureRequired: true },
+      )) as UssdPaymentResponseDto;
 
       this.logger.log('USSD Payment initiated successfully');
       return response;
@@ -77,12 +76,11 @@ export class PaymentsService {
       };
 
       // Make the API request to check transaction status
-      const response =
-        await this.airtelService.makeApiRequest<TransactionStatusResponseDto>(
-          `standard/v1/payments/${transactionId}`,
-          'GET',
-          additionalHeaders,
-        );
+      const response = (await this.airtelService.makeApiRequest(
+        `standard/v1/payments/${transactionId}`,
+        'GET',
+        additionalHeaders,
+      )) as TransactionStatusResponseDto;
 
       this.logger.log(`Transaction status retrieved for ID: ${transactionId}`);
       return response;
@@ -147,9 +145,9 @@ export class PaymentsService {
     }
   }
 
-  private async handleTransactionCallback(
+  handleTransactionCallback = async (
     callbackRequest: CallbackRequestDto,
-  ): Promise<{ status: string }> {
+  ): Promise<{ status: string }> => {
     try {
       const { transaction } = callbackRequest;
 
@@ -157,15 +155,15 @@ export class PaymentsService {
       this.logger.log(`Received callback for transaction: ${transaction.id}`);
 
       // Process based on transaction status
-      switch (transaction.status_code) {
-        case 'TS': // Transaction Success
-          await this.handleSuccessfulTransaction(transaction);
-          break;
-        case 'TF': // Transaction Failed
-          await this.handleFailedTransaction(transaction);
-          break;
-        default:
-          this.logger.warn(`Unknown status code: ${transaction.status_code}`);
+      if (transaction.status_code === 'TS') {
+        // Transaction Success
+        await this.handleSuccessfulTransaction(transaction);
+      } else if (transaction.status_code === 'TF') {
+        // Transaction Failed
+        await this.handleFailedTransaction(transaction);
+      } else {
+        this.logger.warn(`Unknown status code: ${transaction.status_code}`);
+        return { status: 'Bad Request' };
       }
 
       return { status: 'OK' };
@@ -173,9 +171,11 @@ export class PaymentsService {
       this.logger.error('Error processing payment callback', error);
       throw error;
     }
-  }
+  };
 
-  async handleSuccessfulTransaction(transaction: CallbackTransactionData) {
+  handleSuccessfulTransaction = async (
+    transaction: CallbackTransactionData,
+  ) => {
     try {
       this.logger.log(`Publishing successful transaction: ${transaction.id}`);
 
@@ -188,9 +188,9 @@ export class PaymentsService {
       this.logger.error('Failed to publish successful transaction', error);
       throw error;
     }
-  }
+  };
 
-  async handleFailedTransaction(transaction: CallbackTransactionData) {
+  handleFailedTransaction = async (transaction: CallbackTransactionData) => {
     try {
       this.logger.log(`Publishing failed transaction: ${transaction.id}`);
 
@@ -203,5 +203,5 @@ export class PaymentsService {
       this.logger.error('Failed to publish failed transaction', error);
       throw error;
     }
-  }
+  };
 }

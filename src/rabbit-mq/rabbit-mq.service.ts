@@ -54,7 +54,7 @@ export class RabbitMQService {
     }
   }
 
-  async publishPaymentResult(routingKey: string, message: any) {
+  publishPaymentResult = async (routingKey: string, message: any) => {
     if (!this.channel) {
       await this.connect();
     }
@@ -83,7 +83,7 @@ export class RabbitMQService {
       console.error('Failed to publish message', error);
       throw error;
     }
-  }
+  };
 
   // Method to subscribe to messages
   async consumePaymentResults(

@@ -55,11 +55,6 @@ export class TransactionDataDto {
   @ValidateNested()
   @Type(() => TransactionDetailsDto)
   transaction: TransactionDetailsDto;
-
-  @IsObject()
-  @ValidateNested()
-  @Type(() => TransactionStatusDto)
-  status: TransactionStatusDto;
 }
 
 export class TransactionStatusResponseDto {
@@ -67,4 +62,9 @@ export class TransactionStatusResponseDto {
   @ValidateNested()
   @Type(() => TransactionDataDto)
   data: TransactionDataDto;
+
+  @IsObject()
+  @ValidateNested()
+  @Type(() => TransactionStatusDto)
+  status: TransactionStatusDto;
 }

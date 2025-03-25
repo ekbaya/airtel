@@ -64,7 +64,7 @@ Ensure you have the following installed before running the application:
 
 | Method | Endpoint               | Description                            |
 | ------ | ---------------------- | -------------------------------------- |
-| POST   | `/payments/initiate`   | Initiates a payment request            |
+| POST   | `/payments/ussd`       | Initiates a payment request            |
 | GET    | `/payments/status/:id` | Checks the payment status              |
 | POST   | `/payments/callback`   | Handles payment callback notifications |
 

@@ -4,6 +4,7 @@ import {
   IsObject,
   ValidateNested,
   IsOptional,
+  IsBoolean,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -68,18 +69,23 @@ export class PaymentStatusDto {
 }
 
 export class PaymentTransactionDto {
-  @IsString()
-  id: string;
+  @IsBoolean()
+  id: boolean;
 
   @IsString()
   status: string;
 }
 
+class TransactionDataDto {
+  @IsObject()
+  transaction: PaymentTransactionDto;
+}
+
 export class UssdPaymentResponseDto {
   @IsObject()
   @ValidateNested()
-  @Type(() => PaymentTransactionDto)
-  transaction: PaymentTransactionDto;
+  @Type(() => TransactionDataDto)
+  data: TransactionDataDto;
 
   @IsObject()
   @ValidateNested()
