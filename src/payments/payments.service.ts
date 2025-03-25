@@ -1,9 +1,4 @@
-import {
-  Inject,
-  Injectable,
-  Logger,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AirtelService } from '../airtel/airtel.service';
 
@@ -15,16 +10,14 @@ import {
   CallbackRequestDto,
   CallbackTransactionData,
 } from './dto';
-import { ClientProxy, RmqRecordBuilder } from '@nestjs/microservices';
-import { PaymentServices } from 'src/domain/constants/payment';
+import { RabbitMQService } from 'src/rabbit-mq/rabbit-mq.service';
 
 @Injectable()
 export class PaymentsService {
   private readonly logger = new Logger(PaymentsService.name);
 
   constructor(
-    @Inject(PaymentServices.PaymentResultService)
-    private readonly messageClient: ClientProxy,
+    private readonly rabbitMQService: RabbitMQService,
     private readonly airtelService: AirtelService,
     private readonly configService: ConfigService,
   ) {}
@@ -184,46 +177,31 @@ export class PaymentsService {
 
   async handleSuccessfulTransaction(transaction: CallbackTransactionData) {
     try {
-      // Create a record with additional options if needed
-      const record = new RmqRecordBuilder({
-        ...transaction,
-        status: 'SUCCESS',
-        timestamp: new Date().toISOString(),
-      })
-        .setOptions({
-          headers: {
-            'x-transaction-type': 'payment-success',
-          },
-          priority: 1, // Optional priority
-        })
-        .build();
+      this.logger.log(`Publishing successful transaction: ${transaction.id}`);
 
-      // Emit the event to RabbitMQ
-      await this.messageClient.emit('payment.success', record).toPromise();
+      // Publish with a specific routing key
+      await this.rabbitMQService.publishPaymentResult(
+        'payment.success',
+        transaction,
+      );
     } catch (error) {
-      // Log or handle error
-      console.error('Failed to publish payment success', error);
+      this.logger.error('Failed to publish successful transaction', error);
+      throw error;
     }
   }
 
   async handleFailedTransaction(transaction: CallbackTransactionData) {
     try {
-      const record = new RmqRecordBuilder({
-        ...transaction,
-        status: 'FAILED',
-        timestamp: new Date().toISOString(),
-      })
-        .setOptions({
-          headers: {
-            'x-transaction-type': 'payment-failure',
-          },
-          priority: 2, // Potentially higher priority for failures
-        })
-        .build();
+      this.logger.log(`Publishing failed transaction: ${transaction.id}`);
 
-      await this.messageClient.emit('payment.failure', record).toPromise();
+      // Publish with a specific routing key
+      await this.rabbitMQService.publishPaymentResult(
+        'payment.failure',
+        transaction,
+      );
     } catch (error) {
-      console.error('Failed to publish payment failure', error);
+      this.logger.error('Failed to publish failed transaction', error);
+      throw error;
     }
   }
 }

@@ -3,16 +3,10 @@ import { PaymentsController } from './payments.controller';
 import { PaymentsService } from './payments.service';
 import { AirtelModule } from 'src/airtel/airtel.module';
 import { ConfigModule } from '@nestjs/config';
-import { RabbitMqconfigModule } from 'src/rabbit-mqconfig/rabbit-mqconfig.module';
-import { PaymentResultModule } from 'src/payment-result/payment-result.module';
+import { RabbitMqModule } from 'src/rabbit-mq/rabbit-mq.module';
 
 @Module({
-  imports: [
-    RabbitMqconfigModule,
-    AirtelModule,
-    ConfigModule,
-    PaymentResultModule,
-  ],
+  imports: [AirtelModule, ConfigModule, RabbitMqModule],
   controllers: [PaymentsController],
   providers: [PaymentsService],
   exports: [PaymentsService],
