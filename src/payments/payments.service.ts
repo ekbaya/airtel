@@ -22,23 +22,18 @@ export class PaymentsService {
     private readonly configService: ConfigService,
   ) {}
 
-  /**
-   * Initiate USSD Payment
-   */
   async initiateUssdPayment(
     paymentRequest: UssdPaymentRequestDto,
     country: string,
     currency: string,
   ): Promise<UssdPaymentResponseDto> {
     try {
-      // Prepare additional headers
       const additionalHeaders = {
         'X-Country': country,
         'X-Currency': currency,
         Accept: 'application/json',
       };
 
-      // Make the API request (signature is required)
       const response = (await this.airtelService.makeApiRequest(
         'merchant/v2/payments/',
         'POST',
@@ -55,27 +50,18 @@ export class PaymentsService {
     }
   }
 
-  /**
-   * Enquire about transaction status
-   * @param transactionId Transaction ID to check status
-   * @param country Transaction Country
-   * @param currency Transaction Currency
-   * @returns Transaction status details
-   */
   async getTransactionStatus(
     transactionId: string,
     country: string,
     currency: string,
   ): Promise<TransactionStatusResponseDto> {
     try {
-      // Prepare headers as per API specification
       const additionalHeaders = {
         Accept: 'application/json',
         'X-Country': country,
         'X-Currency': currency,
       };
 
-      // Make the API request to check transaction status
       const response = (await this.airtelService.makeApiRequest(
         `standard/v1/payments/${transactionId}`,
         'GET',
@@ -97,13 +83,10 @@ export class PaymentsService {
     callbackRequest: CallbackRequestDto,
     contentType: string,
   ): Promise<{ status: string }> {
-    // Validate Content-Type
     this.validateContentType(contentType);
 
-    // Authenticate callback if hash is provided
     this.authenticateCallback(callbackRequest);
 
-    // Process the transaction based on its status
     return this.handleTransactionCallback(callbackRequest);
   }
 
@@ -120,26 +103,21 @@ export class PaymentsService {
       false,
     );
 
-    // Skip authentication if not enabled
     if (!enableCallbackAuth || !privateKey) {
       return;
     }
 
-    // If authentication is enabled, hash must be present
     if (!callbackRequest.hash) {
       throw new UnauthorizedException('Callback hash is missing');
     }
 
-    // Prepare the payload for hashing (exclude the hash itself)
     const payload = JSON.stringify(callbackRequest.transaction);
 
-    // Generate HMAC SHA256 hash in Base64
     const generatedHash = crypto
       .createHmac('sha256', privateKey)
       .update(payload)
       .digest('base64');
 
-    // Compare the generated hash with the received hash
     if (generatedHash !== callbackRequest.hash) {
       throw new UnauthorizedException('Invalid callback authentication');
     }
@@ -151,15 +129,11 @@ export class PaymentsService {
     try {
       const { transaction } = callbackRequest;
 
-      // Log the callback for audit purposes
       this.logger.log(`Received callback for transaction: ${transaction.id}`);
 
-      // Process based on transaction status
       if (transaction.status_code === 'TS') {
-        // Transaction Success
         await this.handleSuccessfulTransaction(transaction);
       } else if (transaction.status_code === 'TF') {
-        // Transaction Failed
         await this.handleFailedTransaction(transaction);
       } else {
         this.logger.warn(`Unknown status code: ${transaction.status_code}`);
@@ -179,7 +153,6 @@ export class PaymentsService {
     try {
       this.logger.log(`Publishing successful transaction: ${transaction.id}`);
 
-      // Publish with a specific routing key
       await this.rabbitMQService.publishPaymentResult(
         'payment.success',
         transaction,
@@ -194,7 +167,6 @@ export class PaymentsService {
     try {
       this.logger.log(`Publishing failed transaction: ${transaction.id}`);
 
-      // Publish with a specific routing key
       await this.rabbitMQService.publishPaymentResult(
         'payment.failure',
         transaction,

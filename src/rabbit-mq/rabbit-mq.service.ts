@@ -33,18 +33,14 @@ export class RabbitMQService {
     try {
       const config = this.getConfig();
 
-      // Connect to RabbitMQ
       this.connection = await amqp.connect(config.url);
 
-      // Create a channel
       this.channel = await this.connection.createChannel();
 
-      // Declare a topic exchange
       await this.channel.assertExchange(config.exchange, 'topic', {
         durable: true,
       });
 
-      // Declare a queue
       await this.channel.assertQueue(config.queue, { durable: true });
 
       console.log('RabbitMQ connection established');
@@ -62,7 +58,6 @@ export class RabbitMQService {
     try {
       const config = this.getConfig();
 
-      // Publish message to the exchange
       const published = this.channel.publish(
         config.exchange,
         routingKey, // routing key
@@ -85,7 +80,6 @@ export class RabbitMQService {
     }
   };
 
-  // Method to subscribe to messages
   async consumePaymentResults(
     callback: (message: amqp.ConsumeMessage | null) => void,
   ) {
@@ -95,14 +89,12 @@ export class RabbitMQService {
 
     const config = this.getConfig();
 
-    // Bind queue to exchange with routing pattern
     await this.channel.bindQueue(
       config.queue,
       config.exchange,
       'payment.#', // Wildcard routing key pattern
     );
 
-    // Consume messages
     await this.channel.consume(config.queue, (message) => {
       if (message) {
         try {
@@ -116,12 +108,10 @@ export class RabbitMQService {
     });
   }
 
-  // Utility method to generate unique message ID
   private generateMessageId(): string {
     return `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  // Optional: Method to close connection
   async close() {
     if (this.connection) {
       await this.connection.close();
