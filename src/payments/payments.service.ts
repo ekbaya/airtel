@@ -24,7 +24,7 @@ export class PaymentsService {
 
   constructor(
     @Inject(PaymentServices.PaymentResultService)
-    private readonly paymentResultClient: ClientProxy,
+    private readonly messageClient: ClientProxy,
     private readonly airtelService: AirtelService,
     private readonly configService: ConfigService,
   ) {}
@@ -199,9 +199,7 @@ export class PaymentsService {
         .build();
 
       // Emit the event to RabbitMQ
-      await this.paymentResultClient
-        .emit('payment.success', record)
-        .toPromise();
+      await this.messageClient.emit('payment.success', record).toPromise();
     } catch (error) {
       // Log or handle error
       console.error('Failed to publish payment success', error);
@@ -223,9 +221,7 @@ export class PaymentsService {
         })
         .build();
 
-      await this.paymentResultClient
-        .emit('payment.failure', record)
-        .toPromise();
+      await this.messageClient.emit('payment.failure', record).toPromise();
     } catch (error) {
       console.error('Failed to publish payment failure', error);
     }
